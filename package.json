@@ -1,0 +1,27 @@
+{
+  "name": "classroom_helper",
+  "version": "0.0.1",
+  "description": "js port of mass_clone to help with Github Classroom",
+  "main": "classroom_helper.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DigitalHistory/mass_clone.git"
+  },
+  "author": "Brian Konzman and Matt Price",
+  "license": "MIT/GPL",
+  "bugs": {
+    "url": "https://github.com/DigitalHistory/mass_clone/issues"
+  },
+  "homepage": "https://github.com/DigitalHistory/mass_clone#readme",
+  "dependencies": {
+    "@octokit/rest": "^14.0.9",
+    "jsonfile": "^4.0.0",
+    "nodegit": "^0.21.2",
+    "nodegit-kit": "^0.17.0",
+    "octokit": "^0.10.4",
+    "shell": "^0.5.0"
+  }
+}
