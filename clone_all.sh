@@ -6,6 +6,7 @@
 # Written By: Brian Konzman
 
 
+
 if [[ $# -ne 4 ]];
 	then
 	echo ""
@@ -36,9 +37,11 @@ else
 		echo "Using ssh"
 	fi
 
-	echo "Enter Github Password:"
-	read -s githubPassword
-
+	# echo "Enter Github Password:"
+	# read -s githubPassword
+        # don't store gh password here you idiot!
+        source ./.env.sh
+        
 	# Get the first page of repo results (100 entries)
 	rawJSON=$(curl --user  "$githubUsername:$githubPassword" "https://api.github.com/orgs/$organization/repos?per_page=100" -v)
 	# Get the line that tells if this is the last page
@@ -64,8 +67,10 @@ else
 	((lengthOfIdentifier=${#identifier}+2))
 
 	# Make subdirectory and move to it
+        echo "MAKING MAIN DIRECTORY FOR CLONES";
 	mkdir -p ../${identifier}
 	cd ../${identifier}
+        echo $PWD
 
 	while read -r url; do
 		dir=$(basename ${url})
