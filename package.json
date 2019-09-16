@@ -17,11 +17,13 @@
   },
   "homepage": "https://github.com/DigitalHistory/mass_clone#readme",
   "dependencies": {
-    "@octokit/rest": "^14.0.9",
-    "jsonfile": "^4.0.0",
-    "nodegit": "^0.21.2",
-    "nodegit-kit": "^0.17.0",
-    "octokit": "^0.10.4",
-    "shell": "^0.5.0"
+    "@octokit/rest": "^16.14.1",
+    "dotenv": "^6.2.0",
+    "jsonfile": "^5.0.0",
+    "nodegit": "^0.24.0",
+    "nodegit-kit": "^0.20.0",
+    "octokit": "^1.0.0-hello-world",
+    "shell": "^0.5.0",
+    "shelljs": "^0.8.3"
   }
 }
