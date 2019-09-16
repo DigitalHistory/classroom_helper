@@ -1,8 +1,20 @@
 var shell = require('shelljs');
-var fs = require('fs');
-const octokit = require('@octokit/rest')();
+var fs = require('fs'), path = require('path');
 var git = require('nodegit-kit');
 var jsonfile = require('jsonfile');
+
+const Octokit = require('@octokit/rest'),
+      dotenv = require ('dotenv').config(),
+      ghu = process.env.githubUsername,
+      ghp = process.env.githubPassword,
+      org = process.env.githubOrganization,
+      token = process.env.ghOauth,
+      ng = require('nodegit');
+
+
+let octokit = new Octokit(
+  {auth: "token " + token}
+);
 
 
 function branchAndPR (localpath, ghowner, ghrepo, base, head) {
