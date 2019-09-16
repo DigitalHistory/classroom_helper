@@ -1,2 +1,6 @@
 ..DS_Store
 clone_all_helper.sh
+/node_modules
+/advanced-topics*
+/node_modules-old-version
+/.env
