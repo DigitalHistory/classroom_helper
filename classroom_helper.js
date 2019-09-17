@@ -260,7 +260,7 @@ function runTests(assign, baseDir) {
   }
 }
 
-function cloneRepos (assign, org, user, protocol, baseDir) {
+async function cloneRepos (assign, org, user, protocol, baseDir) {
   /**
    * Given an assignment object, and organization, a user, a protocol a base direcotry,
    * and a github password (!), clone all student repos for the assignment into a direcotry
@@ -510,6 +510,97 @@ function cloneAndUpdate (assign, org,  baseDir, upstream, gitref) {
   }
 }
 
+
+const isDirectory = source => fs.lstatSync(source).isDirectory()
+const getDirectories = source =>
+      fs.readdirSync(source).map(name => path.join(source, name)).filter(isDirectory)
+/**
+ * Given an assignment object, run `npm install` in the upstream repo and 
+ * then symlink in all the other dirs.
+ * @param {} assign
+ * @param {} baseDir
+ */
+function installAndLink (assign, baseDir) {
+  shell.cd (baseDir + assign.basename);
+  
+  shell.cd (assign.basename);
+  shell.exec(`npm install`);
+  shell.cd ("..");
+  let repos = getDirectories(path.join(baseDir, assign.basename));
+  for (r of repos ) {
+    shell.cd(r) ;
+    shell.exec(`ln -s ../${assign.basename}/node_modules ./` )
+  }
+  
+  
+}
+
+
+function testAndReport (assign, baseDir, outputFile = 'testresults.json') {
+  let repos = getDirectories(path.join(baseDir, assign.basename)),
+      results = [];
+  shell.cd (baseDir + assign.basename);
+  shell.cd (assign.basename);
+  // shell.exec(`npm install`);
+  shell.cd ("..");
+  for (r of repos ) {
+    if (path.basename(r) === assign.basename) {
+      continue
+    }
+    // console.log("about to cd")
+    shell.cd(r) ;
+    let id = path.basename(r);
+    console.log(id);
+    let o = {github: id };
+    
+    o.tests = 1,
+
+
+    o.reflection = 1;
+    if ( shell.exec(assign.mainTests + ">> /dev/null" ).code > 0) { o.tests = 0; }
+    if ( shell.exec(assign.reflectionTests  + ">> /dev/null" ).code > 0) { o.reflection = 0; }
+    // console.log(code);
+    results.push(o);
+    
+  }
+  console.log(JSON.stringify(results));
+  
+  jsonfile.writeFile(path.join(baseDir, assign.basename, outputFile),
+                     results, function(err) {console.log(err);});
+  return results;
+}
+
+async function testAndReportBranch (assign, branch, id) {
+  /**
+   * assumes we are already in the right repo.  
+   **/
+  // console.log(id);
+  let o = {github: id };
+  o.tests = 0,
+  o.reflection = 0;
+  await GP.exec(['checkout', branch]);
+  shell.exec(`rm  TestResults/testresults.html`);
+  if ( shell.exec(assign.mainTests + ">> /dev/null" ).code == 0) {
+    o.tests = 1; }
+  if ( assign.refletionTests && shell.exec(assign.reflectionTests  + ">> /dev/null" ).code == 0) {
+    o.reflection = 1; }
+  await GP.exec(['add', '-f', 'TestResults/testresults.html']);
+  cl("add is done")
+  await GP.exec(['commit', '-m', "\"Add testresults.html as of DATE\""]);
+  cl ("commit should be done");
+  await GP.exec(['stash' ]);
+    // .catch(function (err) {
+    //   console.log(`oops! ${err}`);
+    // })
+  return o;
+}
+
+
+/**
+ * obsolete with new octokit auth procedure
+ * @param {} user
+ * @param {} pw
+ */
 function authenticateGH (user, pw) {
   /**
    * Just a simple authentication function. 
