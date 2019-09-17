@@ -673,18 +673,34 @@ async function makeManyPRs (org, assignment, head, base, title="Comments on your
     // });
 }
 
+/**
+ * can probably mostly bereplaced by octokit.paginate.  
+ * @param {} method
+ * @param {} args
+ * @returns {} 
+ */
 async function paginateGHResults (method, args) {
   /**
    * Stolen from the octokit docs. An async function to retrieve all results from an
    * octokit query; a workaround for the github API's pagination mechanism. 
    */
-  let response = await method(args)
-  let {data} = response
-  while (octokit.hasNextPage(response)) {
-    response = await octokit.getNextPage(response)
-    data = data.concat(response.data)
-  }
-  return data
+  console.log ("Method is: " + method);
+  const options = method.endpoint.merge(args);
+  console.log(options);
+  octokit.paginate(options)
+    .then(data => {
+      // console.log(data);
+      // return data;
+    })
+  let d = await octokit.paginate(options);
+  return d;
+  // let response = await method(args);
+  // let {data} = response
+  // while (octokit.hasNextPage(response)) {
+  //   response = await octokit.getNextPage(response)
+  //   data = data.concat(response.data)
+  // }
+  // return data
 }
 
 async function findResubmitPRs (org, assign) {
