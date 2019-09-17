@@ -270,28 +270,217 @@ function cloneRepos (assign, org, user, protocol, baseDir) {
    * protocol, username, token/password, whatever.
    * but that is more difficult to do with a dotenv file. 
    */
-  shell.mkdir(baseDir + assign.basename);
+  console.log('inside clonerepos')
+  shell.mkdir('-p', baseDir + assign.basename);
   shell.cd (baseDir + assign.basename);
-  // console.log("Beginning mass clone in directory " + process.cwd());
-  paginateGHResults(octokit.repos.getForOrg, {org: 'DigitalHistory', per_page: 100}).then(
-    data => {
-      let counter = 0;
-      for (d of data) {
-        console.log (d.name.indexOf(assign.basename));
-        if (d.name.indexOf(assign.basename) != -1) {
-          console.log(d.name);
-          // console.log(d.clone_url);
-          // console.log(process.cwd())
-          shell.exec(`git clone ${d.ssh_url} ${baseDir}${assign.basename}/${d.name}`);
-          counter += 1;
-        }
+  shell.exec(`git clone ${assign.upstream} ${baseDir}${assign.basename}/${assign.basename} `);
+  
+  console.log("Beginning mass clone in directory " + process.cwd());
+  const result = await octokit.paginate('GET /orgs/:org/repos', {org: org} );
+  console.log(result);
+  let counter = 0;
+  for (d of result) {
+    let match = d.name.indexOf(assign.basename);
+    // console.log (match);
+    if (match  != -1) {
+      if (d.name === assign.basename ) {
+        shell.exec(`git clone ${d.ssh_url} ${baseDir}${assign.basename}/${assign.basename} `);
+        continue;
       }
-      console.log("there are this many repos: " + counter); 
-    });
-    // shell.exec (`~/src/mass_clone/clone_all.sh ${org} ${assign.basename} ${user} ${protocol}` );
+       console.log(d.name);
+      
+      let student = d.name.substr(match + 1 + assign.basename.length);
+      // console.log(d.clone_url);
+      // console.log(process.cwd())
+      shell.exec(`git clone ${d.ssh_url} ${baseDir}${assign.basename}/${student} `);
+      counter += 1;
+    }
+  }
+  console.log("there are this many repos: " + counter);
+  
 }
 
 
+//TODO: remove idiotic parameters
+async function getRepos (assign, org, user) {
+  /**
+   * ignores everything except `org` and `assign`. 
+   * but that is more difficult to do with a dotenv file. 
+   */
+  console.log('inside getrepos')
+
+  const apiResult = await octokit.paginate('GET /orgs/:org/repos', {org: org} );
+  
+  let counter = 0,
+      data = [];
+  
+  for (d of apiResult) {
+    let match = d.name.indexOf(assign.basename);
+    // console.log (match);
+    if (match  != -1) {
+      if (d.name === assign.basename ) {
+        // shell.exec(`git clone ${d.ssh_url} ${baseDir}${assign.basename}/${assign.basename} `);
+        
+        continue;
+      }
+      
+      let student = d.name.substr(match + 1 + assign.basename.length);
+      data.push({name: d.name, url: d.ssh_url, student: student});
+      counter += 1;
+    }
+  }
+  // console.log("there are this many repos: " + counter);
+  // console.log("Dataset: " + JSON.stringify(data))
+  return data;
+}
+
+
+async function getAllAsBranches (assign,org,user ) {
+  const repos = await getRepos (assign, org, user);
+  let testData = [];
+  for (b of repos) {
+    if (d.name === assign.basename) {
+      continue }
+    let url = b.url;
+    let id = b.name.substr(assign.basename.length + 1);
+
+    // cl(`URL AND ID: ${url} ${id}`)
+    await addRemoteasBranch(url, id );
+    // await GP.exec(['checkout', `${id}-master`]);
+    testData.push (await testAndReportBranch (assign, `${id}-master`, id));
+  }
+  return testData;
+}
+
+//TODO: remove idiotic parameters
+async function getReposAndUpdate (assign, org, user, protocol, baseDir, files) {
+  /**
+   * much simplified.  Must be executed from within the repo.  
+   * baseDir is ignored. protocol is ignored. 
+   */
+  console.log(`update repos with these files: ${JSON.stringify(files)}!`)
+  
+  //const result = await octokit.paginate('GET /orgs/:org/repos', {org: org} );
+  const result = await getRepos (assign, org, user);
+  // console.log(JSON.stringify(result));
+  let counter = 0;
+  for (d of result) {
+    let match = d.name.indexOf(assign.basename);
+    if (match  != -1) {
+      if (d.name === assign.basename ) {
+        continue;
+      }
+      //TODO: take out this protective `if`
+      if (d.name.indexOf(ghu) != -1) {
+        console.log(d.name);
+        let url = d.url;
+        let id = d.name.substr(assign.basename.length + 1);
+        console.log(`Updating repo ${d.name}`);
+        let pathToRepo = "./";
+        cl([url, id, files,pathToRepo]);
+        await updateRemoteFromMaster(url, id, files, pathToRepo)
+        
+        // ng.Repository.open(pathToRepo).then(function (repo) {
+        //   // Inside of this function we have an open repo
+        //   ng.Remote.create(repo, id, url )
+        //     .then(function(remote) {
+        //       shell.exec(`git push ${id} master`);
+        //       // ng.Remote.delete(repo, id);
+        //     });
+        // });
+
+
+      }
+      let student = d.name.substr(match + 1 + assign.basename.length);
+      counter += 1;
+    }
+  }
+  //console.log("there are this many repos: " + counter);
+  }
+
+async function addRemoteasBranch (remoteUrl, remoteName) {
+  let localBranch = remoteName + "-master",
+      GP = GitProcess;
+    GP.exec(['remote', 'add', remoteName, remoteUrl] ).
+    catch (function (err) {console.log(`Add  ${remoteName} failed with ${err}`)});
+  
+  GP.exec(['fetch', remoteName]).
+    then(function () {
+      GP.exec(['checkout', '-b', localBranch, `${remoteName}/master`]).
+        catch (function (err) {console.log`couldn't check out ${localBranch}: ${err}`});
+    }).
+    catch (function (err) {console.log(`Fetch ${remoteName} failed with ${err}`)});
+
+  }
+
+
+// only works if you're in yourrepository! new workflow
+// async function updateRemoteFromMaster (remoteUrl, remoteName, files){
+//   let localBranch = remoteName + "-master";
+//   await shell.exec(`git remote add ${remoteName}  ${remoteUrl} `);
+//   await shell.exec(`git fetch  ${remoteName} `);
+//   await shell.exec(`git checkout -b ${localBranch} ${remoteName}/master`,
+//              function(code, stdout, stderr) {
+//                console.log('Exit code:', code);
+//                console.log('Program output:', stdout);
+//                console.log('Program stderr:', stderr);
+//   })
+//   for (file of files) {
+//     await shell.exec (`git checkout master -- ${file}`);
+//     await shell.exec(`git commit -m "Auto-update ${file} from upstream repo. \n\nAny local changes have been overwritten."`);
+//   }
+//   await shell.exec(`git push ${remoteName} ${localBranch}:master`)
+//   await shell.exec(`git checkout master`);
+//   await shell.exec(`git branch -D ${localBranch}`);
+//   await shell.exec(`git remote remove ${remoteName}`);
+// }
+
+// rewritten with dugite!
+// only works if you're in yourrepository! new workflow
+async function updateRemoteFromMaster (remoteUrl, remoteName, files, path){
+  let localBranch = remoteName + "-master",
+      GP = GitProcess;
+  try {
+    let add = await GP.exec(['remote', 'add', remoteName, remoteUrl] ),
+        fetch =  await GP.exec(['fetch', remoteName]);
+    if (add.exitCode > 0) {
+      throw `Add failed w/ ${add.stderr}`;}
+    let co = await GP.exec(['checkout', '-b', localBranch, `${remoteName}/master`]);
+    if (co.exitCode > 0) {
+      throw `checkout failed w/ ${co.stderr}`;}
+    console.log(JSON.stringify(files));
+    for (file of files) {
+      
+      let co = await GP.exec(['checkout', 'master', '--', file]),
+          ct = await GP.exec(['commit', '-m',
+                              `"Auto update ${file} from upstream repo. \n\nAny local changes have been overwritten."`]);
+      if (ct.exitCode > 0) {
+        console.log( `${file}: commit failed w/ ${ct.stderr} and ${ct.stdout}` )
+      }
+    }
+      
+    let push =  await GP.exec([ 'push',  remoteName,  `${localBranch}:master`]);
+        if (push.exitCode > 0 ) {
+      console.log(`Push failed with ${push.stderr}`);
+    }
+    let master =  await GP.exec([ 'checkout',  'master']);
+    let del  =  await GP.exec([ 'branch',  '-D', `${localBranch}`]);
+    let remove =  await GP.exec([ 'remote',  'remove', `${remoteName}`]);
+
+  } catch (err) {
+    console.log(`ERROR!  ${err}`);
+    await GP.exec(['checkout', 'master']);
+     del  =  await GP.exec([ 'branch',  '-D', `${localBranch}`]);
+     remove =  await GP.exec([ 'remote',  'remove', `${remoteName}`]);
+
+  }
+  
+
+}
+
+
+
+// slated for replacement by 
 function cloneAndUpdate (assign, org,  baseDir, upstream, gitref) {
   /**
    * given an assignment, an org, a baseDir, an upstream repo, and a git reference
