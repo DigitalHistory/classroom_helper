@@ -758,6 +758,17 @@ async function findResubmitBranches (org, assignment) {
   return returnValue;
 }
 
+// initialize the grading repo
+function initGradingRepo (assign, baseDir = "/home/matt/src/") {
+  if (! fs.existsSync (baseDir)) {
+    fs.mkdirSync(baseDir);
+  }
+  if (! fs.existsSync (path.join (baseDir, assign.cloneAs))) {
+    GP.exec(['clone', assign.upstream, assign.cloneAs], baseDir );}
+  
+  shell.cd(path.join (baseDir, assign.cloneAs));
+  shell.exec("npm install");
+}
 
 // makeResubmitBranch (assignment, defaultBasedir, "mahdic", 1);
 async function test() {
@@ -766,7 +777,15 @@ async function test() {
 
 // exports
 
-for (f of  [makeBranch, makePR, makeManyPRs, makeSubmissionBranches, makeResubmitPRs, cloneAndUpdate, makePR, findResubmitPRs, findResubmitBranches, makeResubmitBranch, makeSubmissionBranches, authenticateGH, cloneRepos, runTests, paginateGHResults]) {
+for (f of  [initOcto, makeBranch, makePR, makeManyPRs,
+            makeSubmissionBranches, makeResubmitPRs,
+            cloneAndUpdate, makePR, findResubmitPRs,
+            findResubmitBranches, makeResubmitBranch,
+            makeSubmissionBranches, authenticateGH,
+            cloneRepos, runTests, paginateGHResults,
+            installAndLink, testAndReport,
+            getRepos, getReposAndUpdate,
+            getAllAsBranches, initGradingRepo]) {
   exports[f.name] = f;
 }
 
