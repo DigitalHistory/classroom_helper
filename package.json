@@ -19,6 +19,7 @@
   "dependencies": {
     "@octokit/rest": "^16.14.1",
     "dotenv": "^6.2.0",
+    "dugite": "^1.87.2",
     "jsonfile": "^5.0.0",
     "nodegit": "^0.24.0",
     "nodegit-kit": "^0.20.0",
