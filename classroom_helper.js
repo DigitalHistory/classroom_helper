@@ -81,8 +81,6 @@ async function makeBranch (owner, repo, newbranch, oldref)   {
  * @param {} title
  * @param {} body
  */
-
-
 async function makePR (owner, repo, head, base, title, body = '') {
   // would be nice to return an existing PR if this fails 
   let result;
