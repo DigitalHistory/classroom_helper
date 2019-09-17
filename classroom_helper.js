@@ -1,20 +1,36 @@
-var shell = require('shelljs');
-var fs = require('fs'), path = require('path');
-var git = require('nodegit-kit');
-var jsonfile = require('jsonfile');
+const envFile = "/home/matt/DH/.env",
+      shell = require('shelljs'),
+      fs = require('fs'), path = require('path'),
+      git = require('nodegit-kit'),
+      jsonfile = require('jsonfile'),
+      {GitProcess, GitError, IGitResult} = require('dugite');
+
 
 const Octokit = require('@octokit/rest'),
-      dotenv = require ('dotenv').config(),
+      dotenv = require ('dotenv').config({path: envFile}),
       ghu = process.env.githubUsername,
       ghp = process.env.githubPassword,
       org = process.env.githubOrganization,
       token = process.env.ghOauth,
       ng = require('nodegit');
 
+let  GP = GitProcess;
 
-let octokit = new Octokit(
-  {auth: "token " + token}
-);
+//might need to move this out elsewhere so I can
+// initialize the octokit object somehow (!)
+let octokit;
+
+function initOcto (token) {
+  octokit =   new Octokit(
+    {auth: "token " + token}
+  );
+}
+
+
+function cl (o) {
+  console.log(JSON.stringify(o));
+}
+
 
 
 function branchAndPR (localpath, ghowner, ghrepo, base, head) {
