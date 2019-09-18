@@ -345,11 +345,36 @@ async function getAllAsBranches (assign,org,user ) {
     let id = b.name.substr(assign.basename.length + 1);
 
     // cl(`URL AND ID: ${url} ${id}`)
-    await addRemoteasBranch(url, id );
+    await addRemoteasBranch(assign, url, id ).
+      then( async ( ) => {testData.push (await testAndReportBranch (assign, `${id}-master`, id)); });
     // await GP.exec(['checkout', `${id}-master`]);
-    testData.push (await testAndReportBranch (assign, `${id}-master`, id));
+    // testData.push (await testAndReportBranch (assign, `${id}-master`, id));
   }
   return testData;
+}
+
+async function createRemote (assign, remoteUrl, remoteName) {
+  GP.exec(['branch', '-a']).
+    then  (async ( {stdout })  => {
+      cl(stdout);
+      let re = new RegExp(`remotes\/${remoteName}`);
+      if (! stdout.match(re)) {
+        await GP.exec(['remote', 'add', remoteName, remoteUrl] ).
+          catch((err) => {cl (`Add failed w/ ${err}`); });
+      }
+    }).
+    then( ( ) => {fetch =  await GP.exec(['fetch', remoteName]) });
+};
+
+async function createTrackingBranch(assign, remoteName, branchName) {
+  GP.exec(['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`]).
+    then  (async ( {exitCode })  => {
+      cl(stdout);
+      if (exitCode > 0 ) {
+        await GP.exec(['checkout', '-b', branchName, `${remoteName}/master`]).
+          catch((err) => {cl (`branch creation failed w/ ${err}`); });
+      }
+    });
 }
 
 //TODO: remove idiotic parameters
@@ -358,12 +383,8 @@ async function getReposAndUpdate (assign, org, user, protocol, baseDir, files) {
    * much simplified.  Must be executed from within the repo.  
    * baseDir is ignored. protocol is ignored. 
    */
-  console.log(`update repos with these files: ${JSON.stringify(files)}!`)
-  
-  //const result = await octokit.paginate('GET /orgs/:org/repos', {org: org} );
+  console.log(`update repos with these files: ${JSON.stringify(files)}!`);
   const result = await getRepos (assign, org, user);
-  // console.log(JSON.stringify(result));
-  let counter = 0;
   for (d of result) {
     let match = d.name.indexOf(assign.basename);
     if (match  != -1) {
@@ -374,25 +395,21 @@ async function getReposAndUpdate (assign, org, user, protocol, baseDir, files) {
       if (d.name.indexOf(ghu) != -1) {
         console.log(d.name);
         let url = d.url;
-        let id = d.name.substr(assign.basename.length + 1);
+        let id = d.name.substr(assign.basename.length + 1),
+            branchName = id + '-master';
         console.log(`Updating repo ${d.name}`);
         let pathToRepo = "./";
         cl([url, id, files,pathToRepo]);
-        await updateRemoteFromMaster(url, id, files, pathToRepo)
-        
-        // ng.Repository.open(pathToRepo).then(function (repo) {
-        //   // Inside of this function we have an open repo
-        //   ng.Remote.create(repo, id, url )
-        //     .then(function(remote) {
-        //       shell.exec(`git push ${id} master`);
-        //       // ng.Remote.delete(repo, id);
-        //     });
-        // });
-
-
+        createRemote(assign, url, id).
+          then ( async () => {
+            return createTrackingBranch(assign, id, branchName);
+          }).
+          then( ( ) => {
+            return updateRemoteFromMaster(assign, url, id, files, pathToRepo);
+          })
+          .catch( (err) => { return err; });
       }
-      let student = d.name.substr(match + 1 + assign.basename.length);
-      counter += 1;
+      //let student = d.name.substr(match + 1 + assign.basename.length);
     }
   }
   //console.log("there are this many repos: " + counter);
@@ -549,20 +566,24 @@ async function testAndReportBranch (assign, branch, id) {
   let o = {github: id };
   o.tests = 0,
   o.reflection = 0;
-  await GP.exec(['checkout', branch]);
-  shell.exec(`rm  TestResults/testresults.html`);
-  if ( shell.exec(assign.mainTests + ">> /dev/null" ).code == 0) {
-    o.tests = 1; }
-  if ( assign.refletionTests && shell.exec(assign.reflectionTests  + ">> /dev/null" ).code == 0) {
-    o.reflection = 1; }
-  await GP.exec(['add', '-f', 'TestResults/testresults.html']);
-  cl("add is done")
-  await GP.exec(['commit', '-m', "\"Add testresults.html as of DATE\""]);
-  cl ("commit should be done");
-  await GP.exec(['stash' ]);
-    // .catch(function (err) {
-    //   console.log(`oops! ${err}`);
-    // })
+  await GP.exec(['checkout', branch]).
+    then( () => {
+      if ( shell.exec(assign.mainTests + ">> /dev/null" ).code == 0) {
+        o.tests = 1; }
+      if ( assign.reflectionTests && shell.exec(assign.reflectionTests  + ">> /dev/null" ).code == 0) {
+        o.reflection = 1; }} ).
+    then( () => { GP.exec(['add', '-f', 'TestResults/testresults.html'])  }).
+    then( () => { GP.exec(['commit', '-m', `"Add testresults.html on ${branch}"`])
+                //   then ( ({
+                //    stdout, stderr}) => cl(`commit results: ${stdout}, ${stderr}`));
+                }).
+    then  ( () => {  GP.exec(['stash', 'push', '--include-untracked', '-m', `"Stashing changes brought about by testing on ${branch}"` ]).
+                     then( ( {stdout, stderr} ) => {
+                       //cl(`Stashing ${branch} changes\n stdout:${stdout} \nstderr: ${stderr}`)
+                     }); }).
+    catch(function (err) {
+       console.log(`oops! ${err}`);
+    } ) ;
   return o;
 }
 
