@@ -1,3 +1,7 @@
+//////////////////////////
+// require modules etc. //
+//////////////////////////
+
 const envFile = "/home/matt/DH/.env",
       shell = require('shelljs'),
       fs = require('fs'), path = require('path'),
@@ -31,6 +35,10 @@ function cl (o) {
   console.log(JSON.stringify(o));
 }
 
+
+/////////////////////////////
+// Old multi-repo workflow //
+/////////////////////////////
 
 
 function branchAndPR (localpath, ghowner, ghrepo, base, head) {
@@ -130,8 +138,6 @@ async function makePR (owner, repo, head, base, title, body = '') {
   }
   return result.data;
 }
-
-// makePR('DigitalHistory', 'advanced-topics', 'develop', 'submission-test', 'testing from cli', 'no body');
 
 
 function makeSubmissionBranches (assign,  baseDir, mainbranch = "master", comments="teacher-comments", submission='submission') {
@@ -300,6 +306,11 @@ async function cloneRepos (assign, org, user, protocol, baseDir) {
   
 }
 
+/////////////////////////////////////////////
+// Begin New Workflow                      //
+// Little Above this line matters anymore! //
+/////////////////////////////////////////////
+
 
 //TODO: remove idiotic parameters
 async function getRepos (assign, org, user) {
@@ -307,30 +318,24 @@ async function getRepos (assign, org, user) {
    * ignores everything except `org` and `assign`. 
    * but that is more difficult to do with a dotenv file. 
    */
-  console.log('inside getrepos')
+  //console.log('inside getrepos')
 
   const apiResult = await octokit.paginate('GET /orgs/:org/repos', {org: org} );
   
   let counter = 0,
-      data = [];
-  
+      data = [];  
   for (d of apiResult) {
     let match = d.name.indexOf(assign.basename);
     // console.log (match);
     if (match  != -1) {
       if (d.name === assign.basename ) {
-        // shell.exec(`git clone ${d.ssh_url} ${baseDir}${assign.basename}/${assign.basename} `);
-        
         continue;
       }
-      
       let student = d.name.substr(match + 1 + assign.basename.length);
       data.push({name: d.name, url: d.ssh_url, student: student});
       counter += 1;
     }
   }
-  // console.log("there are this many repos: " + counter);
-  // console.log("Dataset: " + JSON.stringify(data))
   return data;
 }
 
@@ -338,6 +343,8 @@ async function getRepos (assign, org, user) {
 async function getAllAsBranches (assign,org,user ) {
   const repos = await getRepos (assign, org, user);
   let testData = [];
+
+  // this is taken care of by getrepos,reight? 
   for (b of repos) {
     if (d.name === assign.basename) {
       continue }
@@ -346,7 +353,9 @@ async function getAllAsBranches (assign,org,user ) {
 
     // cl(`URL AND ID: ${url} ${id}`)
     await addRemoteasBranch(assign, url, id ).
-      then( async ( ) => {testData.push (await testAndReportBranch (assign, `${id}-master`, id)); });
+      then( async ( ) => {
+        testData.push(await testAndReportBranch (assign, `${id}-master`, id));
+      });
     // await GP.exec(['checkout', `${id}-master`]);
     // testData.push (await testAndReportBranch (assign, `${id}-master`, id));
   }
@@ -398,6 +407,7 @@ async function getReposAndUpdate (assign, org, user, protocol, baseDir, files) {
         let id = d.name.substr(assign.basename.length + 1),
             branchName = id + '-master';
         console.log(`Updating repo ${d.name}`);
+        //
         let pathToRepo = "./";
         cl([url, id, files,pathToRepo]);
         createRemote(assign, url, id).
