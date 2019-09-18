@@ -398,84 +398,55 @@ async function getReposAndUpdate (assign, org, user, protocol, baseDir, files) {
   //console.log("there are this many repos: " + counter);
   }
 
-async function addRemoteasBranch (remoteUrl, remoteName) {
+async function addRemoteasBranch (assign, remoteUrl, remoteName) {
   let localBranch = remoteName + "-master",
       GP = GitProcess;
-    GP.exec(['remote', 'add', remoteName, remoteUrl] ).
-    catch (function (err) {console.log(`Add  ${remoteName} failed with ${err}`)});
-  
-  GP.exec(['fetch', remoteName]).
-    then(function () {
-      GP.exec(['checkout', '-b', localBranch, `${remoteName}/master`]).
-        catch (function (err) {console.log`couldn't check out ${localBranch}: ${err}`});
-    }).
-    catch (function (err) {console.log(`Fetch ${remoteName} failed with ${err}`)});
-
+  // replace these w new functions
+  createRemote (assign, remoteUrl, remoteName).
+    then ( () => { createTrackingBranch (assign, remoteName, localBranch)  }
+           // GP.exec(['remote', 'add', remoteName, remoteUrl] ).
+         ).
+    // then ( ( ) => {GP.exec(['fetch', remoteName]); }).
+    // then( ( ) => {GP.exec(['checkout', '-b', localBranch, `${remoteName}/master`]) ;} ).
+  catch (function (err) {console.log(`Add  ${remoteName} failed with ${err}`);
+                         return err;});
   }
 
-
-// only works if you're in yourrepository! new workflow
-// async function updateRemoteFromMaster (remoteUrl, remoteName, files){
-//   let localBranch = remoteName + "-master";
-//   await shell.exec(`git remote add ${remoteName}  ${remoteUrl} `);
-//   await shell.exec(`git fetch  ${remoteName} `);
-//   await shell.exec(`git checkout -b ${localBranch} ${remoteName}/master`,
-//              function(code, stdout, stderr) {
-//                console.log('Exit code:', code);
-//                console.log('Program output:', stdout);
-//                console.log('Program stderr:', stderr);
-//   })
-//   for (file of files) {
-//     await shell.exec (`git checkout master -- ${file}`);
-//     await shell.exec(`git commit -m "Auto-update ${file} from upstream repo. \n\nAny local changes have been overwritten."`);
-//   }
-//   await shell.exec(`git push ${remoteName} ${localBranch}:master`)
-//   await shell.exec(`git checkout master`);
-//   await shell.exec(`git branch -D ${localBranch}`);
-//   await shell.exec(`git remote remove ${remoteName}`);
-// }
-
-// rewritten with dugite!
-// only works if you're in yourrepository! new workflow
-async function updateRemoteFromMaster (remoteUrl, remoteName, files, path){
-  let localBranch = remoteName + "-master",
-      GP = GitProcess;
-  try {
-    let add = await GP.exec(['remote', 'add', remoteName, remoteUrl] ),
-        fetch =  await GP.exec(['fetch', remoteName]);
-    if (add.exitCode > 0) {
-      throw `Add failed w/ ${add.stderr}`;}
-    let co = await GP.exec(['checkout', '-b', localBranch, `${remoteName}/master`]);
-    if (co.exitCode > 0) {
-      throw `checkout failed w/ ${co.stderr}`;}
-    console.log(JSON.stringify(files));
-    for (file of files) {
-      
-      let co = await GP.exec(['checkout', 'master', '--', file]),
-          ct = await GP.exec(['commit', '-m',
-                              `"Auto update ${file} from upstream repo. \n\nAny local changes have been overwritten."`]);
-      if (ct.exitCode > 0) {
-        console.log( `${file}: commit failed w/ ${ct.stderr} and ${ct.stdout}` )
+// assumes branch exists
+async function updateFilesFromMaster (branch, files) {
+  let output = [];
+  // await createTrackingBranch (assign, )
+  GP.exec(['checkout',  branch, ]).
+    then( ( ) => {
+      for (file of files) {  
+        let o = GP.exec(['checkout', 'master', '--', file]).
+          then( ( ) => {return GP.exec(
+            ['commit', '-m', `"Auto update ${file} from upstream repo. 
+            Any local changes have been overwritten."`]) }).
+            catch ( (err) { return (err)});
+        output.push(o);
       }
-    }
-      
-    let push =  await GP.exec([ 'push',  remoteName,  `${localBranch}:master`]);
-        if (push.exitCode > 0 ) {
-      console.log(`Push failed with ${push.stderr}`);
-    }
-    let master =  await GP.exec([ 'checkout',  'master']);
-    let del  =  await GP.exec([ 'branch',  '-D', `${localBranch}`]);
-    let remove =  await GP.exec([ 'remote',  'remove', `${remoteName}`]);
+    });
+  return output;
+}
 
-  } catch (err) {
-    console.log(`ERROR!  ${err}`);
-    await GP.exec(['checkout', 'master']);
-     del  =  await GP.exec([ 'branch',  '-D', `${localBranch}`]);
-     remove =  await GP.exec([ 'remote',  'remove', `${remoteName}`]);
+async function deleteRemoteandBranch (assign, remoteName, trackingBranch ) {
+  return GP.exec([ 'checkout',  'master']).
+    then( ( ) => {return GP.exec([ 'branch',  '-D', `${localBranch}`]) }).
+    then( ( ) => {return GP.exec([ 'remote',  'remove', `${remoteName}`]);});
+}
 
-  }
-  
-
+// only works if you're in yourrepository! new workflow
+//TODO fix assignment oops!
+async function updateRemoteFromMaster (assign, remoteUrl, remoteName, files, path){
+  let localBranch = remoteName + "-master",
+      GP = GitProcess;
+  return createRemote(assign, remoteUul, remoteName).
+    then( ( ) => {return createTrackingBranch(assign, remoteName, localBranch);  }).
+    then( ( ) => {return updateFilesFromMaster (localBranch, files); }).
+    then( ( ) => {return  GP.exec([ 'push',  remoteName,  `${localBranch}:master`]) }).
+    then( ( ) => {return deleteRemoteandBranch(assign, remoteName, localBranch) }).
+    catch ( (err) => cl(err));
 }
 
 
