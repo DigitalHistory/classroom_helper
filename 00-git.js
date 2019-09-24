@@ -35,6 +35,21 @@ End setup. Begin actual work.
 
 **/
 
+
+// helper
+function writeResultsfile (testResults) {
+  let resultsJS = JSON.stringify (testResults, null, 2);
+  fs.writeFile('/home/matt/DH/Grades/00-results.json', resultsJS, err => {
+    if (err) {
+      console.log('Error writing file', err);
+      return err;
+    } else {
+      console.log('Successfully wrote file');
+      return 0;
+    }
+  });
+}
+
 let results;
 
 ( async () => {
@@ -47,35 +62,42 @@ classroom.initOcto (token);
 
 // step 2: cd back into that dir just in case
 shell.cd(path.join(baseDir, assignment.cloneAs));
-// shell.exec("npm install");
-// step 3: .env is no longer an issue
 
 // step 4: check to mak sure everything is working. 
-  classroom.getRepos(assignment, org, githubUser).
-   then ((data) =>
-     { console.log (`${assignment.basename} has ${data.length} repos associated with it`)});
+// classroom.getRepos(assignment, org, githubUser).
+//    then ((data) =>
+//      { console.log (`${assignment.basename} has ${data.length} repos associated with it`)});
+
+// step 5: updat test files
+  
 
 
-// step 5: do any updates (ugh) resultingfrom your screwups.
-// note that the repo location is ignored -- got fix this sometime
- // classroom.getReposAndUpdate(assignment,
- //                            org, githubUser, 'basic', baseDir, ['README.org', 'style.css']);
+  // step 5: do any updates (ugh) resultingfrom your screwups.
+  // note that the repo location is ignored -- got fix this sometime
+//   // final null: don't push changes to file, just keep local
+//   classroom.getReposAndUpdate(assignment,
+//                               org, githubUser,  ['test/test.js', 'package.json'], null);
 
 
-// step 6: Get all repos as branches and run tests.
-
-  let data = await classroom.getAllAsBranches(assignment, org, githubUser);
-  console.log(JSON.stringify(data));
-  let resultsJS = JSON.stringify (data, null, 2);
-  fs.writeFile('/home/matt/DH/Grades/00-results.json', resultsJS, err => {
-        if (err) {
-          console.log('Error writing file', err);
-        } else {
-          console.log('Successfully wrote file');
-        }
-      });
-// gather all the js info and images if poss
-// shell commands
+//  step 6: Get all repos as branches and run tests.
+  // get branches
+  // await classroom.getAllAsBranches(assignment, org, githubUser);
+  // retrieve branch list
+  // let branchList = await classroom.getAllBranches(assignment, baseDir);
+  // update test files
+  // let upates = classroom.updateFilesAllBranches (assignment, baseDir, ['test/test.js'], branchList );
+  // await classroom.updateFilesAllBranches (assignment,baseDir, ['test/test.js'], branchList);
+  
+  // run tests and collect data
+  // let testResults = classroom.testAllBranches(assignment, baseDir, branchList);
+  // let tests = classroom.updateFilesAllBranches(assignment,baseDir, ['test/test.js'])
+  // writeresultsfile(testResults);
+  
+  // console.log(JSON.stringify(testResults, null, 2));
+// // gather all the js info and images if poss
+//   // shell commands
+  shell.exec('git checkout master; for ref in $(git for-each-ref --format=\'%(refname:short)\' refs/heads  ) ; do git checkout $ref --   images/${ref%-master}.jpg ; done');
+  shell.exec('git checkout master; for ref in $(git for-each-ref --format=\'%(refname:short)\' refs/heads  ) ; do git checkout $ref --   students/${ref%-master}.json ; done');
 // for ref in $(git for-each-ref --format='%(refname:short)' refs/heads  ) ; do git checkout $ref --   images/${ref%-master}.jpg ; done
 // for ref in $(git for-each-ref --format='%(refname:short)' refs/heads  ) ; do git checkout $ref --   students/${ref%-master}.json ; done
 
