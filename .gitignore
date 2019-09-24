@@ -4,3 +4,4 @@ clone_all_helper.sh
 /advanced-topics*
 /node_modules-old-version
 /.env
+/.env.sh
