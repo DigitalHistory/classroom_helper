@@ -909,7 +909,7 @@ function initGradingRepo (assign, baseDir = "/home/matt/src/") {
     GP.exec(['clone', assign.upstream, assign.cloneAs], baseDir );}
   
   shell.cd(path.join (baseDir, assign.cloneAs));
-  shell.exec(`git config push-default upstream`)
+  shell.exec(`git config push.default upstream`)
   shell.exec("npm install");
 }
 
