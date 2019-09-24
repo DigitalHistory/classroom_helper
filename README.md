@@ -4,8 +4,10 @@ This is a collection of scripts scavenged for the itnernet that I use to make my
 
 Included in this repo are lightly modified shell scripts from the original repo  as well as `classroom-helper.js`, a node script which is the most useful object here (probably). It is unfortunately poorly-documented and a bit chaotic.  This readme is a work in progress and likely to be out of date, please feel free to ask questions or submit PR's.
 
+Goal is to make this installable as an npm module that can be run from a class repo, allowing an instructor to use own scripts based on examples.  
+
 ## Configuration
-You'll need to ocpy the `.env-sample` file to `.env` and update the variable values. If you run the script directly from your local repository (the new recommended method), you'll need a copy in that repository.  Some of the newer fuctions also make reference to an `Assignments.json` file; to use them, you'll need to generate that and put it in the right place.
+You'll need to copy the `.env-sample` file to `.env` **in the root directory of your project**  and update the variable values. If you run the script directly from your local repository (the new recommended method), you'll need a copy in that repository.  Some of the newer fuctions also make reference to an `Assignments.json` file; to use them, you'll need to generate that and put it in the right place.
 
 The run `npm install`, you should be good. 
 
@@ -15,6 +17,12 @@ In past years, I cloned everyone's repositories individually & ran npm install o
 
 This year, in part because of some hassle with Github's new `template repoitories`, I am trying a nw system: I add every student repo as a remote to a pristine repo or my own (**not** my developmentrepo!). I make new branches tracking each of their master branches, run tests, save the results, and then go on to the next one.  I'm riggine my org-mode functions to check out the appropriate branches rather than navigate to different repositories. I'm hoping it will make things less chaotic in the long run.
 
+## Which version of git??
+
+There are a number of excellent npm modules for git out there in the wild. Unfortunately, they all use asynchro ous methods. This is fine for most operations, especially if you want to **extract informaition about the repository**. But this workflow demands active modification of many branhces of the repo. This is easiest todo **synchronously**.  so while I have experimented with dugite and nodekit, for now I have been rewriting most functions to use `shelljs`.  I have no idea if this works at all on windows, but should work on all Unix-based systems.
+
+## Examples
+Some example scripts are in [the examples directory](./examples). 
 
 ### API
 
@@ -111,7 +119,10 @@ If you would like to setup an ssh key: https://help.github.com/articles/generati
 
 If you are running windows, here is a stack post that may help with ssh: https://stackoverflow.com/questions/18404272/running-ssh-agent-when-starting-git-bash-on-windows
 
-##  push_all.sh
+## Old Shell Scripts
+These are still here for now, though if htisis gonna be an npm repo they need to go. 
+
+###  push_all.sh
 
 Adds all files, commits, then pushes all changes.
 
@@ -119,7 +130,7 @@ Takes 1 argument, the unique identifier(folder containing repos)
 
 Used the commit message "Graded", but can be changed.
 
-## clone_all_helper.sh
+### clone_all_helper.sh
 
 This script runs clone_all.sh with three arguments as defaults, Organization, username, and protocol
 
