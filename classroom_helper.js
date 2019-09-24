@@ -306,233 +306,6 @@ async function cloneRepos (assign, org, user, protocol, baseDir) {
   
 }
 
-/////////////////////////////////////////////
-// Begin New Workflow                      //
-// Little Above this line matters anymore! //
-/////////////////////////////////////////////
-
-
-//TODO: remove idiotic parameters
-async function getRepos (assign, org, user) {
-  /**
-   * ignores everything except `org` and `assign`. 
-   * but that is more difficult to do with a dotenv file. 
-   */
-  //console.log('inside getrepos')
-
-  const apiResult = await octokit.paginate('GET /orgs/:org/repos', {org: org} );
-  
-  let counter = 0,
-      data = [];  
-  for (d of apiResult) {
-    let match = d.name.indexOf(assign.basename);
-    // console.log (match);
-    if (match  != -1) {
-      if (d.name === assign.basename ) {
-        continue;
-      }
-      let student = d.name.substr(match + 1 + assign.basename.length);
-      data.push({name: d.name, url: d.ssh_url, student: student});
-      counter += 1;
-    }
-  }
-  return data;
-}
-
-
-async function getAllAsBranches (assign,org,user ) {
-  const repos = await getRepos (assign, org, user);
-  let testData = [];
-
-  // this is taken care of by getrepos,reight? 
-  for (b of repos) {
-    if (d.name === assign.basename) {
-      continue }
-    let url = b.url;
-    let id = b.name.substr(assign.basename.length + 1);
-
-    // cl(`URL AND ID: ${url} ${id}`)
-    await addRemoteasBranch(assign, url, id ).
-      then( async ( ) => {
-        testData.push(await testAndReportBranch (assign, `${id}-master`, id));
-      });
-    // await GP.exec(['checkout', `${id}-master`]);
-    // testData.push (await testAndReportBranch (assign, `${id}-master`, id));
-  }
-  return testData;
-}
-
-async function createRemote (assign, remoteUrl, remoteName) {
-  GP.exec(['branch', '-a']).
-    then  (async ( {stdout })  => {
-      cl(stdout);
-      let re = new RegExp(`remotes\/${remoteName}`);
-      if (! stdout.match(re)) {
-        await GP.exec(['remote', 'add', remoteName, remoteUrl] ).
-          catch((err) => {cl (`Add failed w/ ${err}`); });
-      }
-    }).
-    then( ( ) => {fetch =  await GP.exec(['fetch', remoteName]) });
-};
-
-async function createTrackingBranch(assign, remoteName, branchName) {
-  GP.exec(['show-ref', '--verify', '--quiet', `refs/heads/${branchName}`]).
-    then  (async ( {exitCode })  => {
-      cl(stdout);
-      if (exitCode > 0 ) {
-        await GP.exec(['checkout', '-b', branchName, `${remoteName}/master`]).
-          catch((err) => {cl (`branch creation failed w/ ${err}`); });
-      }
-    });
-}
-
-//TODO: remove idiotic parameters
-async function getReposAndUpdate (assign, org, user, protocol, baseDir, files) {
-  /**
-   * much simplified.  Must be executed from within the repo.  
-   * baseDir is ignored. protocol is ignored. 
-   */
-  console.log(`update repos with these files: ${JSON.stringify(files)}!`);
-  const result = await getRepos (assign, org, user);
-  for (d of result) {
-    let match = d.name.indexOf(assign.basename);
-    if (match  != -1) {
-      if (d.name === assign.basename ) {
-        continue;
-      }
-      //TODO: take out this protective `if`
-      if (d.name.indexOf(ghu) != -1) {
-        console.log(d.name);
-        let url = d.url;
-        let id = d.name.substr(assign.basename.length + 1),
-            branchName = id + '-master';
-        console.log(`Updating repo ${d.name}`);
-        //
-        let pathToRepo = "./";
-        cl([url, id, files,pathToRepo]);
-        createRemote(assign, url, id).
-          then ( async () => {
-            return createTrackingBranch(assign, id, branchName);
-          }).
-          then( ( ) => {
-            return updateRemoteFromMaster(assign, url, id, files, pathToRepo);
-          })
-          .catch( (err) => { return err; });
-      }
-      //let student = d.name.substr(match + 1 + assign.basename.length);
-    }
-  }
-  //console.log("there are this many repos: " + counter);
-  }
-
-async function addRemoteasBranch (assign, remoteUrl, remoteName) {
-  let localBranch = remoteName + "-master",
-      GP = GitProcess;
-  // replace these w new functions
-  createRemote (assign, remoteUrl, remoteName).
-    then ( () => { createTrackingBranch (assign, remoteName, localBranch)  }
-           // GP.exec(['remote', 'add', remoteName, remoteUrl] ).
-         ).
-    // then ( ( ) => {GP.exec(['fetch', remoteName]); }).
-    // then( ( ) => {GP.exec(['checkout', '-b', localBranch, `${remoteName}/master`]) ;} ).
-  catch (function (err) {console.log(`Add  ${remoteName} failed with ${err}`);
-                         return err;});
-  }
-
-// assumes branch exists
-async function updateFilesFromMaster (branch, files) {
-  let output = [];
-  // await createTrackingBranch (assign, )
-  GP.exec(['checkout',  branch, ]).
-    then( ( ) => {
-      for (file of files) {  
-        let o = GP.exec(['checkout', 'master', '--', file]).
-          then( ( ) => {return GP.exec(
-            ['commit', '-m', `"Auto update ${file} from upstream repo. 
-            Any local changes have been overwritten."`]) }).
-            catch ( (err) { return (err)});
-        output.push(o);
-      }
-    });
-  return output;
-}
-
-async function deleteRemoteandBranch (assign, remoteName, trackingBranch ) {
-  return GP.exec([ 'checkout',  'master']).
-    then( ( ) => {return GP.exec([ 'branch',  '-D', `${localBranch}`]) }).
-    then( ( ) => {return GP.exec([ 'remote',  'remove', `${remoteName}`]);});
-}
-
-// only works if you're in yourrepository! new workflow
-//TODO fix assignment oops!
-async function updateRemoteFromMaster (assign, remoteUrl, remoteName, files, path){
-  let localBranch = remoteName + "-master",
-      GP = GitProcess;
-  return createRemote(assign, remoteUul, remoteName).
-    then( ( ) => {return createTrackingBranch(assign, remoteName, localBranch);  }).
-    then( ( ) => {return updateFilesFromMaster (localBranch, files); }).
-    then( ( ) => {return  GP.exec([ 'push',  remoteName,  `${localBranch}:master`]) }).
-    then( ( ) => {return deleteRemoteandBranch(assign, remoteName, localBranch) }).
-    catch ( (err) => cl(err));
-}
-
-
-
-// slated for replacement by 
-function cloneAndUpdate (assign, org,  baseDir, upstream, gitref) {
-  /**
-   * given an assignment, an org, a baseDir, an upstream repo, and a git reference
-   * (branch or commit) clone all assignment repos, checkout master, merge changes
-   * from upstream, and push to origin
-   */
-  // cloneRepos(assign, org, null, null, baseDir, null);
-    shell.cd (baseDir + assign.basename);
-  var listing = shell.ls();
-  for (i of listing) {
-    let p = baseDir + assign.basename + "/" + i;
-    console.log(`Making changes for ${p}`);
-    if (fs.lstatSync(p).isDirectory() && i.indexOf(assign.basename) != -1 ) {
-      shell.cd(i);
-      console.log("adding remote");
-      shell.exec(`git remote add upstream  ${upstream} && git fetch upstream `);
-      console.log("merging");
-      shell.exec(`git merge upstream/master`);
-      // shell.exec(`git push origin submission; git push origin teacher-comments; hub pull-request -h submission -b teacher-comments -m "comments on your assignment" >> ../pull-request-list.txt`);
-      // convert to makePR - -but this requires using git to extract the repo name
-      // for this we'll need nodegit, I think.
-      // var r = new RegExp('github.com:(.*)/(.*).git');
-      
-      //makePR (org, )
-      shell.cd ("..");
-    }
-  }
-}
-
-
-const isDirectory = source => fs.lstatSync(source).isDirectory()
-const getDirectories = source =>
-      fs.readdirSync(source).map(name => path.join(source, name)).filter(isDirectory)
-/**
- * Given an assignment object, run `npm install` in the upstream repo and 
- * then symlink in all the other dirs.
- * @param {} assign
- * @param {} baseDir
- */
-function installAndLink (assign, baseDir) {
-  shell.cd (baseDir + assign.basename);
-  
-  shell.cd (assign.basename);
-  shell.exec(`npm install`);
-  shell.cd ("..");
-  let repos = getDirectories(path.join(baseDir, assign.basename));
-  for (r of repos ) {
-    shell.cd(r) ;
-    shell.exec(`ln -s ../${assign.basename}/node_modules ./` )
-  }
-  
-  
-}
-
 
 function testAndReport (assign, baseDir, outputFile = 'testresults.json') {
   let repos = getDirectories(path.join(baseDir, assign.basename)),
@@ -568,25 +341,392 @@ function testAndReport (assign, baseDir, outputFile = 'testresults.json') {
   return results;
 }
 
+// slated for replacement by 
+function cloneAndUpdate (assign, org,  baseDir, upstream, gitref) {
+  /**
+   * given an assignment, an org, a baseDir, an upstream repo, and a git reference
+   * (branch or commit) clone all assignment repos, checkout master, merge changes
+   * from upstream, and push to origin
+   */
+  // cloneRepos(assign, org, null, null, baseDir, null);
+    shell.cd (baseDir + assign.basename);
+  var listing = shell.ls();
+  for (i of listing) {
+    let p = baseDir + assign.basename + "/" + i;
+    console.log(`Making changes for ${p}`);
+    if (fs.lstatSync(p).isDirectory() && i.indexOf(assign.basename) != -1 ) {
+      shell.cd(i);
+      console.log("adding remote");
+      shell.exec(`git remote add upstream  ${upstream} && git fetch upstream `);
+      console.log("merging");
+      shell.exec(`git merge upstream/master`);
+      // shell.exec(`git push origin submission; git push origin teacher-comments; hub pull-request -h submission -b teacher-comments -m "comments on your assignment" >> ../pull-request-list.txt`);
+      // convert to makePR - -but this requires using git to extract the repo name
+      // for this we'll need nodegit, I think.
+      // var r = new RegExp('github.com:(.*)/(.*).git');
+      
+      //makePR (org, )
+      shell.cd ("..");
+    }
+  }
+}
+
+
+/////////////////////////////////////////////
+// Begin New Workflow                      //
+// Little Above this line matters anymore! //
+/////////////////////////////////////////////
+
+
+//TODO: remove idiotic parameters
+/**
+ * Returns an array of all repos matching the assignment basename.
+ * Each element of the array wil lbe an object with the fields `name`, 
+ * `url`, and `student`
+ * @param {string} assign
+ * @param {string} org
+ * @param {string} user: unused, should beremoved. 
+ * @returns {array} 
+ */
+async function getRepos (assign, org, user) {
+  /**
+   * ignores everything except `org` and `assign`. 
+   * but that is more difficult to do with a dotenv file. 
+   */
+  //console.log('inside getrepos')
+
+  const apiResult = await octokit.paginate('GET /orgs/:org/repos', {org: org} );
+  
+  let counter = 0,
+      data = [];  
+  for (d of apiResult) {
+    let match = d.name.indexOf(assign.basename);
+    // console.log (match);
+    if (match  != -1) {
+      if (d.name === assign.basename ) {
+        continue;
+      }
+      let student = d.name.substr(match + 1 + assign.basename.length);
+      data.push({name: d.name, url: d.ssh_url, student: student});
+      counter += 1;
+    }
+  }
+  return data;
+}
+
+
+/**
+ * Adds all matching student assignments as remotes and creates a tracking branch for each one.
+ * @param {object} assign
+ * @param {string} org
+ * @param {string} user
+ */
+async function getAllAsBranches (assign,org,user ) {
+  const repos = await getRepos (assign, org, user);
+  cl(repos);
+  // this is taken care of by getrepos,reight? 
+  for (let r of repos) {
+    if (d.name === assign.basename) {
+      continue }
+    let url = r.url;
+    let id = r.name.substr(assign.basename.length + 1);
+
+    // cl(`URL AND ID: ${url} ${id}`)
+    await addRemoteasBranch(assign, url, id );
+    // await GP.exec(['checkout', `${id}-master`]);
+    // testData.push (await testAndReportBranch (assign, `${id}-master`, id));
+  }
+}
+
+async function createRemote (assign, remoteUrl, remoteName) {
+  shell.exec(`git remote add ${remoteName} ${remoteUrl}`);
+  shell.exec(`git fetch ${remoteName}`);
+  
+  // GP.exec(['branch', '-a']).
+  //   then  (async ( {stdout })  => {
+  //     //cl(stdout);
+  //     let re = new RegExp(`remotes\/${remoteName}`);
+  //     if (! stdout.match(re)) {
+  //       await GP.exec(['remote', 'add', remoteName, remoteUrl] ).
+  //         catch((err) => {cl (`Add failed w/ ${err}`); });
+  //     }
+  //   }).
+  //   then(async ( ) => {fetch =  await GP.exec(['fetch', remoteName]) });
+};
+
+async function createTrackingBranch(assign, remoteName, branchName) {
+  // cl([remoteName, branchName]);
+  let branchExists = shell.exec(`git show-ref --verify --quiet refs/heads${branchName}`).code,
+      base = assign.basename,
+      result =  branchExists ?  shell.exec(`git fetch ${remoteName } ; git checkout -b ${branchName} ${remoteName}/master`) :
+      shell.exec(`git checkout ${branchName} && git pull`);
+
+  //cl(result);
+  return result;
+}
+
+
+
+/**
+ * Synchronously run tests on all branches and report back with results;
+ * @param {} assign
+ * @param {} basedir
+ * @param {array} branchlist
+ * @returns {} 
+ */
+function testAllBranches (assign, basedir, branchList) {
+  testData = [];
+  for (let b of branchList) {
+    let id = b.match(/(\w+)-master/) ? b.match(/(\w+)-master/)[1] : null;
+    if (id) {
+        testData.push(testAndReportBranchSync(assign, b, id));
+    }
+  }
+  return testData;
+}
+
+
+//TODO: remove idiotic parameters
+function getReposAndUpdate (assign, org, user,  files, push) {
+  /**
+   * much simplified.  Must be executed from within the repo.  
+   * baseDir is ignored. protocol is ignored. 
+   */
+  console.log(`update repos with these files: ${JSON.stringify(files)}!`);
+  
+  getRepos (assign, org, user).
+    then ( (result ) => {
+      for (d of result) {
+         let match = d.name.indexOf(assign.basename);
+        if (match  != -1) {
+          if (d.name === assign.basename ) {
+            continue;
+          }
+          //TODO: take out this protective `if`
+          //if (d.name.indexOf(ghu) != -1) {
+          console.log(d.name);
+          let url = d.url,
+              id = d.name.substr(assign.basename.length + 1),
+              branchName = id + '-master';
+          console.log(`Updating repo ${d.name}`);
+          //not usng this
+          let pathToRepo = "./";
+          // cl([url, id, files,pathToRepo]);
+          createRemote(assign, url, id).
+            then ( async () => {
+              return createTrackingBranch(assign, id, branchName);
+            }).
+            then( ( ) => {
+              cl(`about to update branch ${id}-master`)
+              return updateRemoteFromMaster(assign, url, id, files, push);
+            })
+            .catch( (err) => { return err; });
+          //}
+          //let student = d.name.substr(match + 1 + assign.basename.length);
+        }
+      }
+    } ); 
+  //console.log("there are this many repos: " + counter);
+}
+
+async function addRemoteasBranch (assign, remoteUrl, remoteName) {
+  let localBranch = remoteName + "-master",
+      GP = GitProcess;
+  // replace these w new functions
+  createRemote (assign, remoteUrl, remoteName).
+    then ( () => { createTrackingBranch (assign, remoteName, localBranch)  }
+           // GP.exec(['remote', 'add', remoteName, remoteUrl] ).
+         ).
+    // then ( ( ) => {GP.exec(['fetch', remoteName]); }).
+    // then( ( ) => {GP.exec(['checkout', '-b', localBranch, `${remoteName}/master`]) ;} ).
+  catch (function (err) {console.log(`Add  ${remoteName} failed with ${err}`);
+                         return err;});
+  }
+
+////////////////////////////////////////
+// aync functions using native git to //
+// update branches with files         //
+////////////////////////////////////////
+
+/**
+ * query the assignment and get a list of branches
+ * @param {} assign assingment object
+ * @param {string} basedir root directory i nwhich to find repo
+ * @returns {array} an array of all branch names
+ */
+async function getAllBranches (assign, basedir) {
+  let repo = await ng.Repository.open(path.join(basedir, assign.cloneAs)),
+      result = await repo.getReferenceNames(ng.Reference.TYPE.LISTALL).
+      then ((names) => {
+        let a = names.filter(function (str) { return str.includes("refs/heads"); })
+        a.forEach(function(part, index) {
+          this[index] = this[index].substr(11)
+        }, a);
+        return a;
+      });
+  return result;
+};
+
+async function updateFilesAllBranches (assign,basedir, files, branches) {
+  branches = branches ? branches:  await getAllBranches (assign, basedir);
+  for (b of branches) {
+    for (f of files) {
+      cl(`comming $f} in ${b}`);
+      shell.exec(`git stash; git checkout ${b}; git checkout master -- ${f}; git commit -a -m "add ${f} from master"; git checkout master`)
+    }
+  }
+}
+
+
+/**
+ * pushes all changes on all branches to default remotes
+ * @param {object} assign
+ * @param {string} basedir: root directory in which to find gitrepo
+ */
+async function pushAllBranches (assign, basedir) {
+  let branches = await getAllBranches (assign, basedir);
+  for (b of branches) {
+    shell.exec(`git checkout ${b} && git push `);
+  }
+}
+
+/**
+ * update BRANCH with FILES from master
+ * @param {string} branch 
+ * @param {array} files
+ */
+async function updateBranchFiles (branch, files) {
+  for (f of files) {
+    shell.exec(`git stash; git checkout ${branch}; git checkout master -- ${f}; git commit -a -m "add ${f} from master"; git checkout master`)
+  }
+}
+
+
+
+/**
+ * Delete remote and local tracking branch
+ * @param {object} assign
+ * @param {string} remoteName
+ * @param {string} trackingBranch
+ * @returns {iGitresult} 
+ */
+async function deleteRemoteandBranch (assign, remoteName, trackingBranch ) {
+  return GP.exec([ 'checkout',  'master']).
+    then( ( ) => {return GP.exec([ 'branch',  '-D', `${localBranch}`]) }).
+    then( ( ) => {return GP.exec([ 'remote',  'remove', `${remoteName}`]);});
+}
+
+// only works if you're in yourrepository! new workflow
+//TODO fix assignment oops!
+
+/**
+ * Having a lot of trouble with tis functin, which is supposed to
+ * update all branches and optionally push toremotes. but can't get
+ * async code to work in what is fundamentally a synchronous process
+ * @param {object} assign
+ * @param {string} basedir
+ * @param {string} remoteUrl
+ * @param {string} remoteName
+ * @param {array} files
+ * @param {boolean} push
+ * @returns {iGitresult} 
+ */
+function updateRemoteFromMaster (assign, basedir, remoteUrl,  remoteName, files, push){
+  let localBranch = remoteName + "-master",
+      GP = GitProcess;
+  createRemote(assign, remoteUrl, remoteName).
+    then( ( ) => {createTrackingBranch(assign, remoteName, localBranch) }).
+    then( ( ) => {
+      updateBranchFiles (localBranch, files);
+    }).
+    then( ( ) => {
+      if (push) {
+        GP.exec([ 'push',  remoteName,  `${localBranch}:master`]).
+          then( ( ) => {return deleteRemoteandBranch(assign, remoteName, localBranch) });
+    } })
+}
+
+
+
+
+
+const isDirectory = source => fs.lstatSync(source).isDirectory()
+const getDirectories = source =>
+      fs.readdirSync(source).map(name => path.join(source, name)).filter(isDirectory)
+/**
+ * Given an assignment object, run `npm install` in the upstream repo and 
+ * then symlink in all the other dirs.
+ * @param {} assign
+ * @param {} baseDir
+ */
+function installAndLink (assign, baseDir) {
+  shell.cd (baseDir + assign.basename);
+  
+  shell.cd (assign.basename);
+  shell.exec(`npm install`);
+  shell.cd ("..");
+  let repos = getDirectories(path.join(baseDir, assign.basename));
+  for (r of repos ) {
+    shell.cd(r) ;
+    shell.exec(`ln -s ../${assign.basename}/node_modules ./` )
+  }
+  
+  
+}
+
+/**
+ * Synchronously (!) checkout and test each studnt branch, collet results return
+ * @param {object} assign
+ * @param {string} branch
+ * @param {string} studentid
+ * @returns {object} 
+ */
+function testAndReportBranchSync (assign, branch, studentid) {
+  let o = {github: studentid, tests: 0, reflection: 0 };
+  shell.exec(`git checkout ${branch}`);
+  // record main tests
+  if ( shell.exec(assign.mainTests + ">> /dev/null" ).code == 0) {
+    o.tests = 1; }
+  //record ref tests
+  if ( assign.reflectionTests && shell.exec(assign.reflectionTests  + ">> /dev/null" ).code == 0) {
+    o.reflection = 1; }
+  cl(o)
+  // but commit ALL tests to repo
+  assign.allTests && shell.exec(assign.mainTests + ">> /dev/null" )  ;
+  shell.exec(`git add -f TestResults/testresults.html && git commit -m "Add testresults.html on ${branch}"`);
+  shell.exec(`git stash push --include-untracked -m "Stashing all from ${branch} after testing"`);
+  return o;
+}
+
 async function testAndReportBranch (assign, branch, id) {
   /**
    * assumes we are already in the right repo.  
    **/
   // console.log(id);
-  let o = {github: id };
-  o.tests = 0,
-  o.reflection = 0;
-  await GP.exec(['checkout', branch]).
+  let o = {github: id, tests: 0, reflection: 0 };
+  return GP.exec(['checkout', branch]).
     then( () => {
+      // record results of main tests
       if ( shell.exec(assign.mainTests + ">> /dev/null" ).code == 0) {
         o.tests = 1; }
+      //record ref tests
       if ( assign.reflectionTests && shell.exec(assign.reflectionTests  + ">> /dev/null" ).code == 0) {
-        o.reflection = 1; }} ).
-    then( () => { GP.exec(['add', '-f', 'TestResults/testresults.html'])  }).
-    then( () => { GP.exec(['commit', '-m', `"Add testresults.html on ${branch}"`])
-                //   then ( ({
-                //    stdout, stderr}) => cl(`commit results: ${stdout}, ${stderr}`));
-                }).
+        o.reflection = 1; }
+      // but commit all tests
+      cl(o)
+      return assign.allTests && shell.exec(assign.mainTests + ">> /dev/null" )  ;
+    }).
+    then( () => {
+      cl(`seem to have checked out and run tests.`);
+      return GP.exec(['add', '-f', 'TestResults/testresults.html']);  }).
+    then( (res) => {
+      // cl(res) ;
+      return GP.exec(['commit', '-m', `"Add testresults.html on ${branch}"`]).
+        then (
+          ({ stdout, stderr}) => {
+        // cl(`commit results: ${stdout}, ${stderr}`));
+          });
+    }).
     then  ( () => {  GP.exec(['stash', 'push', '--include-untracked', '-m', `"Stashing changes brought about by testing on ${branch}"` ]).
                      then( ( {stdout, stderr} ) => {
                        //cl(`Stashing ${branch} changes\n stdout:${stdout} \nstderr: ${stderr}`)
@@ -769,6 +909,7 @@ function initGradingRepo (assign, baseDir = "/home/matt/src/") {
     GP.exec(['clone', assign.upstream, assign.cloneAs], baseDir );}
   
   shell.cd(path.join (baseDir, assign.cloneAs));
+  shell.exec(`git config push-default upstream`)
   shell.exec("npm install");
 }
 
@@ -787,7 +928,9 @@ for (f of  [initOcto, makeBranch, makePR, makeManyPRs,
             cloneRepos, runTests, paginateGHResults,
             installAndLink, testAndReport,
             getRepos, getReposAndUpdate,
-            getAllAsBranches, initGradingRepo]) {
+            getAllAsBranches, initGradingRepo,
+            getAllBranches, updateFilesAllBranches,
+            pushAllBranches, testAllBranches]) {
   exports[f.name] = f;
 }
 
