@@ -10,7 +10,7 @@ const envFile = "/home/matt/DH/.env",
       {GitProcess, GitError, IGitResult} = require('dugite');
 
 
-const Octokit = require('@octokit/rest'),
+const {Octokit} = require('@octokit/rest'),
       dotenv = require ('dotenv').config({path: envFile}),
       ghu = process.env.githubUsername,
       ghp = process.env.githubPassword,
