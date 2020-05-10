@@ -479,7 +479,8 @@ async function createTrackingBranch(assign, remoteName, branchName) {
 function testAllBranches (assign, basedir, branchList) {
   testData = [];
   for (let b of branchList) {
-    let id = b.match(/(\w+)-master/) ? b.match(/(\w+)-master/)[1] : null;
+    let id = b.match(/([A-Za-z0-9_-]+)-master/) ?
+        b.match(/([A-Za-z0-9_-]+)-master/)[1] : null;
     if (id) {
         testData.push(testAndReportBranchSync(assign, b, id));
     }
