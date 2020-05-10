@@ -24,6 +24,8 @@ let  GP = GitProcess;
 // initialize the octokit object somehow (!)
 let octokit;
 
+octokit = new Octokit({auth:"token" + token})
+
 function initOcto (token) {
   octokit =   new Octokit(
     {auth: "token " + token}
