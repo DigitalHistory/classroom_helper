@@ -142,7 +142,7 @@ async function makePR (owner, repo, head, base, title, body = '') {
 }
 
 
-function makeSubmissionBranches (assign,  baseDir, mainbranch = "master", comments="teacher-comments", submission='submission') {
+function makeSubmissionBranches (assign,  baseDir, mainBranch = "master", comments="teacher-comments", submission='submission') {
   /**
    * given an assignment object and a base directory, cd to the base directory and
    * iterate across all git repositories, creating both a "teacher-comments" branch and
@@ -162,8 +162,8 @@ function makeSubmissionBranches (assign,  baseDir, mainbranch = "master", commen
       shell.cd(i);
       console.log(`cding to ${i} to attempt ${comments} branch`);
       shell.exec(`git branch ${comments} ${assign.teacherCommit}`);
-      shell.exec(`git fetch && git checkout --track origin/${mainbranch} || git checkout ${mainbranch}`)
-      var lastGoodCommit = shell.exec(`git rev-list --before=${assign.deadline} -n 1 ${mainbranch}`).stdout.slice(0,-1);
+      shell.exec(`git fetch && git checkout --track origin/${mainBranch} || git checkout ${mainBranch}`)
+      var lastGoodCommit = shell.exec(`git rev-list --before=${assign.deadline} -n 1 ${mainBranch}`).stdout.slice(0,-1);
       console.log(`attempting to branch ${submission} from commit number ${lastGoodCommit}`)
       shell.exec(`git checkout -b ${submission} ${lastGoodCommit}`);
       console.log('pushing branches & creating PR');
@@ -344,7 +344,7 @@ function testAndReport (assign, baseDir, outputFile = 'testresults.json') {
 }
 
 // slated for replacement by 
-function cloneAndUpdate (assign, org,  baseDir, upstream, gitref) {
+function cloneAndUpdate (assign, org,  baseDir, upstream, gitref, mainBranch = "master") {
   /**
    * given an assignment, an org, a baseDir, an upstream repo, and a git reference
    * (branch or commit) clone all assignment repos, checkout master, merge changes
@@ -361,7 +361,7 @@ function cloneAndUpdate (assign, org,  baseDir, upstream, gitref) {
       console.log("adding remote");
       shell.exec(`git remote add upstream  ${upstream} && git fetch upstream `);
       console.log("merging");
-      shell.exec(`git merge upstream/master`);
+      shell.exec(`git merge upstream/${mainBranch}`);
       // shell.exec(`git push origin submission; git push origin teacher-comments; hub pull-request -h submission -b teacher-comments -m "comments on your assignment" >> ../pull-request-list.txt`);
       // convert to makePR - -but this requires using git to extract the repo name
       // for this we'll need nodegit, I think.
@@ -434,13 +434,15 @@ async function getAllAsBranches (assign,org,user ) {
     let id = r.name.substr(assign.basename.length + 1);
 
     // cl(`URL AND ID: ${url} ${id}`)
+    console.log(`about to add remote ${url} for ${assign} user ${id}`);
     await addRemoteasBranch(assign, url, id );
-    // await GP.exec(['checkout', `${id}-master`]);
+    // await GP.exec(['checkout', `${id}-${mainBranch}`]);
     // testData.push (await testAndReportBranch (assign, `${id}-master`, id));
   }
 }
 
 async function createRemote (assign, remoteUrl, remoteName) {
+  console.log(`createing remote ${remoteName}`);
   shell.exec(`git remote add ${remoteName} ${remoteUrl}`);
   shell.exec(`git fetch ${remoteName}`);
   
@@ -456,11 +458,11 @@ async function createRemote (assign, remoteUrl, remoteName) {
   //   then(async ( ) => {fetch =  await GP.exec(['fetch', remoteName]) });
 };
 
-async function createTrackingBranch(assign, remoteName, branchName) {
+async function createTrackingBranch(assign, remoteName, branchName, mainBranch = "master") {
   // cl([remoteName, branchName]);
   let branchExists = shell.exec(`git show-ref --verify --quiet refs/heads${branchName}`).code,
       base = assign.basename,
-      result =  branchExists ?  shell.exec(`git fetch ${remoteName } ; git checkout -b ${branchName} ${remoteName}/master`) :
+      result =  branchExists ?  shell.exec(`git fetch ${remoteName } ; git checkout -b ${branchName} ${remoteName}/${mainBranch}`) :
       shell.exec(`git checkout ${branchName} && git pull`);
 
   //cl(result);
@@ -476,24 +478,33 @@ async function createTrackingBranch(assign, remoteName, branchName) {
  * @param {array} branchlist
  * @returns {} 
  */
-function testAllBranches (assign, basedir, branchList) {
+function testAllBranches (assign, basedir, branchList, mainBranch = "master") {
   testData = [];
+  let branchRE = new RegExp("([A-Za-z0-9_-]+)-" + mainBranch)
   for (let b of branchList) {
-    let id = b.match(/([A-Za-z0-9_-]+)-master/) ?
-        b.match(/([A-Za-z0-9_-]+)-master/)[1] : null;
+    let id = b.match(branchRE) ?
+        b.match(branchRE)[1] : null;
     if (id) {
-        testData.push(testAndReportBranchSync(assign, b, id));
+      testData.push(testAndReportBranchSync(assign, b, id));
     }
   }
+  
   return testData;
 }
 
 
 //TODO: remove idiotic parameters
-function getReposAndUpdate (assign, org, user,  files, push) {
+function getReposAndUpdate (assign, org, user,  files, push, mainBranch="master") {
   /**
    * much simplified.  Must be executed from within the repo.  
-   * baseDir is ignored. protocol is ignored. 
+   * baseDir is ignored. protocol is ignored.
+   * retrieve a list of repos
+   * then pull them in, and add extra commits
+   * amending any files that need to be pulled from my local
+   * development branch of the repo
+   * usually thiswill be only test/test.js and package.json at most
+   * hopefully often not even that.
+   * Can also be used to push out latbreaking changes that I screwed up
    */
   console.log(`update repos with these files: ${JSON.stringify(files)}!`);
   
@@ -510,7 +521,7 @@ function getReposAndUpdate (assign, org, user,  files, push) {
           console.log(d.name);
           let url = d.url,
               id = d.name.substr(assign.basename.length + 1),
-              branchName = id + '-master';
+              branchName = `id-${mainBranch}`;
           console.log(`Updating repo ${d.name}`);
           //not usng this
           let pathToRepo = "./";
@@ -520,7 +531,7 @@ function getReposAndUpdate (assign, org, user,  files, push) {
               return createTrackingBranch(assign, id, branchName);
             }).
             then( ( ) => {
-              cl(`about to update branch ${id}-master`)
+              cl(`about to update branch ${id}-${mainBranch}`)
               return updateRemoteFromMaster(assign, url, id, files, push);
             })
             .catch( (err) => { return err; });
@@ -532,19 +543,32 @@ function getReposAndUpdate (assign, org, user,  files, push) {
   //console.log("there are this many repos: " + counter);
 }
 
-async function addRemoteasBranch (assign, remoteUrl, remoteName) {
-  let localBranch = remoteName + "-master",
-      GP = GitProcess;
+
+/**
+ * Add a remote and create new tracking branch to its `master`
+ * @param {Obj} assign
+ * @param {String} remoteUrl
+ * @param {String} remoteName
+ * @returns {} 
+ */
+async function addRemoteasBranch (assign, remoteUrl, remoteName, mainBranch = "master") {
+  let localBranch = `remoteName-${mainBranch}`,
+      GP = GitProcess,
+      localExists = await GP.exec(['rev-parse', '--quiet', '--verify', localBranch] );
   // replace these w new functions
-  createRemote (assign, remoteUrl, remoteName).
-    then ( () => { createTrackingBranch (assign, remoteName, localBranch)  }
-           // GP.exec(['remote', 'add', remoteName, remoteUrl] ).
-         ).
-    // then ( ( ) => {GP.exec(['fetch', remoteName]); }).
+
+  if (localExists.exitCode > 0) {
+
+    createRemote (assign, remoteUrl, remoteName).
+      then ( () => { createTrackingBranch (assign, remoteName, localBranch)  }
+             // GP.exec(['remote', 'add', remoteName, remoteUrl] ).
+           ).
+      // then ( ( ) => {GP.exec(['fetch', remoteName]); }).
     // then( ( ) => {GP.exec(['checkout', '-b', localBranch, `${remoteName}/master`]) ;} ).
-  catch (function (err) {console.log(`Add  ${remoteName} failed with ${err}`);
-                         return err;});
-  }
+    catch (function (err) {console.log(`Add  ${remoteName} failed with ${err}`);
+                           return err;});
+  } else {console.log(`branch ${localBranch} already exists, not creating.`);}
+}
 
 ////////////////////////////////////////
 // aync functions using native git to //
@@ -570,12 +594,32 @@ async function getAllBranches (assign, basedir) {
   return result;
 };
 
-async function updateFilesAllBranches (assign,basedir, files, branches) {
+async function updateFilesAllBranchesLocal (assign,basedir, files, branches, mainBranch="master") {
+  branches = branches ? branches:  await getAllBranches (assign, basedir);
+  let localCopy = assign.devDir;
+  // console.error('IN UPDATEFILESLOCAL')
+  shell.exec(`git stash; git checkout ${mainBranch}`);
+  for (f of files) {
+    cl(`committing ${f} in ${mainBranch}`);
+    shell.exec(`cp ${localCopy}/${f} ${f} ; git add ${f}; git status; git commit  -m "add ${f} from master"`)
+  }
+  for (b of branches) {
+    for (f of files) {
+      let diffExists = await GitProcess.exec(['diff', b, mainBranch, '--exit-code', '--', f]);
+      if ( diffExists.exitCode > 0 ) {
+        cl(`committing ${f} in ${b}`);
+        shell.exec(`git stash; git checkout ${b}; git checkout ${mainBranch} -- ${f}; git commit -a -m "add ${f} from master"; git checkout master`);
+      } else {console.log(`no diff between ${mainBranch} and ${b}, won't commit`);}
+    }
+  }
+}
+
+async function updateFilesAllBranches (assign,basedir, files, branches, mainBranch='master') {
   branches = branches ? branches:  await getAllBranches (assign, basedir);
   for (b of branches) {
     for (f of files) {
-      cl(`comming $f} in ${b}`);
-      shell.exec(`git stash; git checkout ${b}; git checkout master -- ${f}; git commit -a -m "add ${f} from master"; git checkout master`)
+      cl(`committing ${f}} in ${b}`);
+      shell.exec(`git stash; git checkout ${b}; git checkout ${mainBranch} -- ${f}; git commit -a -m "add ${f} from ${mainBranch}"; git checkout master`)
     }
   }
 }
@@ -598,13 +642,11 @@ async function pushAllBranches (assign, basedir) {
  * @param {string} branch 
  * @param {array} files
  */
-async function updateBranchFiles (branch, files) {
+async function updateBranchFiles (branch, files, mainBranch=`master`) {
   for (f of files) {
-    shell.exec(`git stash; git checkout ${branch}; git checkout master -- ${f}; git commit -a -m "add ${f} from master"; git checkout master`)
+    shell.exec(`git stash; git checkout ${branch}; git checkout ${mainBranch} -- ${f}; git commit -a -m "add ${f} from master"; git checkout master`)
   }
 }
-
-
 
 /**
  * Delete remote and local tracking branch
@@ -613,8 +655,8 @@ async function updateBranchFiles (branch, files) {
  * @param {string} trackingBranch
  * @returns {iGitresult} 
  */
-async function deleteRemoteandBranch (assign, remoteName, trackingBranch ) {
-  return GP.exec([ 'checkout',  'master']).
+async function deleteRemoteandBranch (assign, remoteName, trackingBranch, mainBranch = `master` ) {
+  return GP.exec([ 'checkout',  mainBranch]).
     then( ( ) => {return GP.exec([ 'branch',  '-D', `${localBranch}`]) }).
     then( ( ) => {return GP.exec([ 'remote',  'remove', `${remoteName}`]);});
 }
@@ -634,8 +676,8 @@ async function deleteRemoteandBranch (assign, remoteName, trackingBranch ) {
  * @param {boolean} push
  * @returns {iGitresult} 
  */
-function updateRemoteFromMaster (assign, basedir, remoteUrl,  remoteName, files, push){
-  let localBranch = remoteName + "-master",
+function updateRemoteFromMaster (assign, basedir, remoteUrl,  remoteName, files, push, mainBranch = 'master'){
+  let localBranch = `remoteName-${mainBranch}`,
       GP = GitProcess;
   createRemote(assign, remoteUrl, remoteName).
     then( ( ) => {createTrackingBranch(assign, remoteName, localBranch) }).
@@ -644,7 +686,7 @@ function updateRemoteFromMaster (assign, basedir, remoteUrl,  remoteName, files,
     }).
     then( ( ) => {
       if (push) {
-        GP.exec([ 'push',  remoteName,  `${localBranch}:master`]).
+        GP.exec([ 'push',  remoteName,  `${localBranch}:$mainBranch`]).
           then( ( ) => {return deleteRemoteandBranch(assign, remoteName, localBranch) });
     } })
 }
